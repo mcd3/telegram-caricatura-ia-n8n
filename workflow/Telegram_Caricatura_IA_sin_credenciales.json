@@ -1,0 +1,279 @@
+{
+  "name": "Telegram → Caricatura IA → Telegram",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {
+          "download": true,
+          "imageSize": "large"
+        }
+      },
+      "id": "0bab0885-5851-4167-ac44-c0e1d83a7453",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -624,
+        128
+      ],
+      "webhookId": "telegram-caricatura-webhook",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "YOUR_TELEGRAM_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has-binary-image",
+              "leftValue": "={{ $binary.data !== undefined }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "14dfb261-951f-463c-b3a0-1138d88b2a39",
+      "name": "¿Hay imagen?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -384,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/images/edits",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer YOUR_OPENAI_API_KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "image",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "model",
+              "value": "gpt-image-1.5"
+            },
+            {
+              "name": "size",
+              "value": "1024x1536"
+            },
+            {
+              "name": "quality",
+              "value": "medium"
+            },
+            {
+              "name": "output_format",
+              "value": "png"
+            },
+            {
+              "name": "prompt",
+              "value": "Create a highly exaggerated hand-drawn caricature illustration based only on the person or people visible in the supplied reference image. Use exactly the same number of people as in the reference image: do not add, remove, duplicate, replace or invent anyone. Preserve each person's recognizability, facial structure, hairstyle, expression, clothing, pose and visible hand placement. Exaggerate oversized expressive eyes, a very large cheerful smile and teeth, rounded or stretched cheeks, expressive eyebrows, enlarged head proportions, ears when appropriate and playful humorous facial proportions. Style: blue pencil sketch, graphite-style shading, visible rough construction lines, loose hand-drawn strokes, crosshatching, professional caricature artist quality, highly detailed facial drawing, whimsical sketchbook illustration, polished but intentionally hand-drawn. Composition: one unified illustration, closely framed upper-body portrait, balanced composition, no separate panels and no photographic elements. Background: clean cream-colored sketchbook paper with subtle paper texture and minimal background. Do not include the original photograph, realistic portraits, split screen, comparison panels, reference thumbnails, borders, labels, captions, names, logos, watermarks or text. Preserve recognizability despite the strong exaggeration."
+            }
+          ]
+        },
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "18012d80-c170-4675-a265-1bb9f579b4ab",
+      "name": "Crear caricatura con OpenAI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -112,
+        16
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $json;\n\nif (response.error) {\n  throw new Error(response.error.message || 'OpenAI no pudo generar la imagen');\n}\n\nconst base64 = response?.data?.[0]?.b64_json;\nif (!base64) {\n  throw new Error('La respuesta de OpenAI no contiene data[0].b64_json');\n}\n\nreturn [{\n  json: {\n    ok: true,\n    chat_id: $('Telegram Trigger').item.json.message.chat.id\n  },\n  binary: {\n    data: {\n      data: base64,\n      mimeType: 'image/png',\n      fileName: 'caricatura.png'\n    }\n  }\n}];"
+      },
+      "id": "c600a3b5-db6b-4337-8afc-6149ee29a962",
+      "name": "Base64 a imagen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        144,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "sendPhoto",
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "binaryData": true,
+        "additionalFields": {
+          "caption": "Aquí tienes tu caricatura."
+        }
+      },
+      "id": "1645eaa7-62be-4318-bf9f-e70458dbb6f4",
+      "name": "Devolver caricatura",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        400,
+        16
+      ],
+      "webhookId": "0d58845f-0c1b-4714-afb2-5d3d459c7617",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "YOUR_TELEGRAM_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "Envíame una fotografía como imagen. Crearé una caricatura en estilo lápiz azul y te la devolveré por este mismo chat.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "08bfd095-59b1-43e9-ba61-e882b783f2f5",
+      "name": "Pedir una imagen",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -112,
+        256
+      ],
+      "webhookId": "914a327d-b3e6-40b1-b4f0-6120999966ea",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "YOUR_TELEGRAM_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "Trabajando...",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "48665741-b796-4e3a-82ea-a9f11a7f4319",
+      "name": "Trabajando",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -192,
+        -144
+      ],
+      "webhookId": "914a327d-b3e6-40b1-b4f0-6120999966ea",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "YOUR_TELEGRAM_CREDENTIAL_NAME"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "¿Hay imagen?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Hay imagen?": {
+      "main": [
+        [
+          {
+            "node": "Crear caricatura con OpenAI",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Trabajando",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Pedir una imagen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crear caricatura con OpenAI": {
+      "main": [
+        [
+          {
+            "node": "Base64 a imagen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Base64 a imagen": {
+      "main": [
+        [
+          {
+            "node": "Devolver caricatura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "3d960f95-0d91-4504-93e2-ed3cbd110525",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "0adf7915f349cfc54d718db9315e6227cfc18e5ff6d6197fdbc4227112f10ed2"
+  },
+  "id": "DCPZvpa7ulss9lfg",
+  "tags": []
+}
