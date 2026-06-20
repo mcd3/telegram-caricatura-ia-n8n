@@ -1,0 +1,1224 @@
+{
+  "name": "Telegram → OpenAI o Local HERCULES V11 — Plantilla pública",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## V11 — PLANTILLA PÚBLICA SIN CREDENCIALES\n\nEste archivo está preparado para GitHub y no contiene:\n\n- credenciales de Telegram;\n- token del bot;\n- clave de OpenAI;\n- webhook interno;\n- IP privada de HERCULES;\n- ID, versión ni metadatos propios de la instalación n8n.\n\n### Configuración después de importar\n\n1. Asigna tu credencial de Telegram a todos los nodos Telegram.\n2. En `Crear caricatura con OpenAI1`, sustituye:\n   `REEMPLAZA_CON_TU_OPENAI_API_KEY`\n3. Sustituye `HERCULES_IP` por la IP o DNS del equipo que ejecuta:\n   - Ollama: puerto `11434`\n   - ComfyUI: puerto `8188`\n4. Activa únicamente un Telegram Trigger para el mismo bot.\n5. Guarda y activa el workflow después de completar la configuración.\n\n### Rama Local\n\n- Ollama clasifica: persona, animal, objeto o mixto.\n- `keep_alive: 0` descarga Ollama de la GPU.\n- Espera 5 segundos antes de ejecutar ComfyUI.\n- Cada categoría utiliza sus prompts positivo y negativo.\n- `AJUSTES LOCAL` centraliza seed, steps, CFG, denoise, shift y fuerza del Lightning LoRA.\n\n### Valores actuales\n\n- timeout ComfyUI/Ollama: `3000000`\n- espera ComfyUI: `600` comprobaciones\n- espera tras Ollama: `5` segundos\n- steps: `4`\n- CFG: `1`\n- denoise: `1`\n- Lightning LoRA: `1`\n",
+        "height": 430,
+        "width": 510
+      },
+      "id": "5e840061-4ba9-465d-95d8-d011f64eddf8",
+      "name": "LEER ANTES",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        528,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message",
+          "callback_query"
+        ],
+        "additionalFields": {
+          "download": true,
+          "imageSize": "large"
+        }
+      },
+      "id": "0da8d6c8-5e0d-4e13-89a3-1752cfc1b73b",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        576,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "is-callback",
+              "leftValue": "={{ $json.callback_query !== undefined }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "401d7e1f-66aa-4e82-b000-f8cf82c02787",
+      "name": "¿Es selección de botón?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        816,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has-image",
+              "leftValue": "={{ $binary.data !== undefined }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a574b888-fd94-4d8f-a129-7f7ed74cdfe9",
+      "name": "¿Hay imagen?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1056,
+        656
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\n\nif (!item.binary || !item.binary.data) {\n  throw new Error('No se encontró la fotografía binaria.');\n}\n\nconst token = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;\n\nreturn [{\n  json: {\n    token,\n    chat_id: $('Telegram Trigger').first().json.message.chat.id,\n    telegram_message_id: $('Telegram Trigger').first().json.message.message_id\n  },\n  binary: item.binary\n}];"
+      },
+      "id": "f48e15dc-f561-4944-8646-5ef8c8769804",
+      "name": "Preparar imagen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1296,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://HERCULES_IP:8188/upload/image",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "image",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "overwrite",
+              "value": "false"
+            },
+            {
+              "name": "type",
+              "value": "input"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3000000
+        }
+      },
+      "id": "1957111c-0d9a-49c3-a3f0-9e6a5574a594",
+      "name": "Subir foto temporal a ComfyUI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1552,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const upload = $json;\nconst original = $('Preparar imagen').first().json;\n\nif (!upload?.name) {\n  throw new Error('ComfyUI no devolvió el nombre de la imagen subida.');\n}\n\nconst store = $getWorkflowStaticData('global');\nstore.jobs ??= {};\n\nconst now = Date.now();\nconst maxAge = 24 * 60 * 60 * 1000;\n\n// Limpiar solicitudes antiguas\nfor (const [key, value] of Object.entries(store.jobs)) {\n  if (!value?.created_at || now - value.created_at > maxAge) {\n    delete store.jobs[key];\n  }\n}\n\nstore.jobs[original.token] = {\n  filename: upload.name,\n  subfolder: upload.subfolder || '',\n  type: upload.type || 'input',\n  chat_id: original.chat_id,\n  created_at: now\n};\n\nreturn [{\n  json: {\n    token: original.token,\n    chat_id: original.chat_id,\n    filename: upload.name\n  }\n}];"
+      },
+      "id": "4b5235a6-5e0d-43b4-972f-2b16cbf68fc7",
+      "name": "Guardar solicitud",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "Elige cómo quieres generar la caricatura:",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✨ OpenAI",
+                    "additionalFields": {
+                      "callback_data": "={{ 'openai:' + $json.token }}"
+                    }
+                  },
+                  {
+                    "text": "🖥️ Local HERCULES",
+                    "additionalFields": {
+                      "callback_data": "={{ 'local:' + $json.token }}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "22fb388d-5600-4600-af46-65dd14247693",
+      "name": "Mostrar botones Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2048,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "text": "Envíame una fotografía como imagen.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "8d22ce6b-af51-442a-806f-4c86ffc64122",
+      "name": "Pedir una imagen",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1296,
+        784
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const query = $json.callback_query;\n\nif (!query) {\n  throw new Error('No se recibió callback_query.');\n}\n\nconst raw = String(query.data || '');\nconst [motor, token] = raw.split(':');\n\nconst result = {\n  valid: false,\n  motor,\n  token,\n  callback_query_id: query.id,\n  chat_id: query.message?.chat?.id,\n  selection_message_id: query.message?.message_id,\n  notice: 'La solicitud ya no está disponible. Envía de nuevo la fotografía.'\n};\n\nif (!['openai', 'local'].includes(motor) || !token) {\n  return [{ json: result }];\n}\n\nconst store = $getWorkflowStaticData('global');\nstore.jobs ??= {};\nconst job = store.jobs[token];\n\nif (!job || Number(job.chat_id) !== Number(result.chat_id)) {\n  return [{ json: result }];\n}\n\n// Consumir la solicitud para evitar dobles ejecuciones\ndelete store.jobs[token];\n\nreturn [{\n  json: {\n    ...result,\n    valid: true,\n    filename: job.filename,\n    subfolder: job.subfolder || '',\n    type: job.type || 'input',\n    notice: motor === 'local'\n      ? 'Procesando con HERCULES local…'\n      : 'Procesando con OpenAI…'\n  }\n}];"
+      },
+      "id": "4a8ddff1-8607-48f7-9c1b-6d76824ce90d",
+      "name": "Procesar selección",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "callback",
+        "queryId": "={{ $json.callback_query_id }}",
+        "additionalFields": {
+          "cache_time": 0,
+          "show_alert": false,
+          "text": "={{ $json.notice }}"
+        }
+      },
+      "id": "a22e1a12-cfd4-46e1-9e49-ec61e2bc9158",
+      "name": "Confirmar botón en Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1296,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid-selection",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c2a5d389-5ef5-4526-8ce5-89d2d72ef9dc",
+      "name": "¿Selección válida?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1296,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "editMessageText",
+        "chatId": "={{ $json.chat_id }}",
+        "messageId": "={{ $json.selection_message_id }}",
+        "text": "={{ $json.motor === 'local' ? 'Procesando con Local HERCULES…' : 'Procesando con OpenAI…' }}",
+        "additionalFields": {}
+      },
+      "id": "2864177b-f9ef-4177-b612-57fb55b8be45",
+      "name": "Quitar botones",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1552,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'http://HERCULES_IP:8188/view?filename=' + encodeURIComponent($json.filename) + '&subfolder=' + encodeURIComponent($json.subfolder || '') + '&type=' + encodeURIComponent($json.type || 'input') }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
+          "timeout": 3000000
+        }
+      },
+      "id": "0e3ec809-6cda-4c2c-b796-74d61961b323",
+      "name": "Recuperar foto original",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1552,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "is-local",
+              "leftValue": "={{ $('Procesar selección').first().json.motor }}",
+              "rightValue": "local",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "07966f31-7e4b-4a9b-8694-9b3475be71c2",
+      "name": "¿Motor Local?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1792,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $json;\n\nif (response.error) {\n  throw new Error(response.error.message || 'OpenAI no pudo generar la imagen');\n}\n\nconst base64 = response?.data?.[0]?.b64_json;\n\nif (!base64) {\n  throw new Error('La respuesta de OpenAI no contiene data[0].b64_json');\n}\n\nreturn [{\n  json: {\n    ok: true,\n    chat_id: $('Procesar selección').first().json.chat_id\n  },\n  binary: {\n    data: {\n      data: base64,\n      mimeType: 'image/png',\n      fileName: 'caricatura_openai.png'\n    }\n  }\n}];"
+      },
+      "id": "e3f4d891-d137-4d76-8dc8-b8a03bd629d5",
+      "name": "Base64 OpenAI a imagen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2288,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "sendPhoto",
+        "chatId": "={{ $('Procesar selección').first().json.chat_id }}",
+        "binaryData": true,
+        "additionalFields": {
+          "caption": "Caricatura generada con OpenAI."
+        }
+      },
+      "id": "88db8788-58d4-49fc-96de-3a0aa2d6f2fc",
+      "name": "Devolver caricatura OpenAI",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2544,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\n\nif (!item.binary?.data) {\n  throw new Error('No se pudo recuperar la imagen original desde ComfyUI.');\n}\n\nconst buffer = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst selection = $('Procesar selección').first().json;\n\nconst ollama_body = {\n  model: 'qwen3-vl:8b-instruct',\n  stream: false,\n  format: 'json',\n  keep_alive: 0,\n  messages: [\n    {\n      role: 'user',\n      content: \"Clasifica únicamente el contenido principal de la imagen.\\n\\nDevuelve exclusivamente un objeto JSON válido con una sola propiedad:\\n\\n{\\\"tipo_sujeto\\\":\\\"persona\\\"}\\n\\nValores permitidos:\\n- \\\"persona\\\": una o varias personas son el contenido principal.\\n- \\\"animal\\\": uno o varios animales son el contenido principal.\\n- \\\"objeto\\\": el contenido principal es un objeto, máquina, vehículo, escafandra, traje, pieza histórica, obra o elemento técnico sin una persona real como sujeto principal.\\n- \\\"mixto\\\": aparecen de forma importante sujetos de dos o más categorías anteriores.\\n\\nNo describas la imagen.\\nNo añadas explicaciones.\\nNo añadas ninguna otra propiedad.\",\n      images: [buffer.toString('base64')]\n    }\n  ],\n  options: {\n    temperature: 0\n  }\n};\n\nreturn [{\n  json: {\n    ...selection,\n    image_base64: buffer.toString('base64'),\n    mime_type: item.binary.data.mimeType || 'image/png',\n    ollama_body\n  },\n  binary: item.binary\n}];"
+      },
+      "id": "e284b920-25a4-4a1a-801d-11d433b3c1fb",
+      "name": "Preparar foto para Ollama",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2048,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://HERCULES_IP:11434/api/chat",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.ollama_body }}",
+        "options": {
+          "timeout": 3000000
+        }
+      },
+      "id": "3492c3f0-403a-4f1a-a3b4-684f5cd5541e",
+      "name": "Analizar con Ollama",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2288,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const positivePrompt = String($json.positive_base || '').trim();\nconst suppliedNegative = String($json.negative_prompt || '').trim();\nconst tipo = String($json.tipo_sujeto || 'mixto').toLowerCase().trim();\n\nif (!positivePrompt) {\n  throw new Error('Falta el prompt positivo de la categoría seleccionada.');\n}\n\nconst selection = $('Procesar selección').first().json;\nconst uploadedName = selection.filename;\nconst chatId = selection.chat_id;\n\nif (!uploadedName) {\n  throw new Error('No se encontró el nombre de la imagen subida a ComfyUI.');\n}\n\nconst settings = $json.local_settings || {};\n\nconst seedMode = settings.seed_mode || 'random';\nconst fixedSeed = Number(settings.fixed_seed ?? 987654321);\n\nconst seed = seedMode === 'fixed'\n  ? fixedSeed\n  : Math.floor(Math.random() * 2147483647);\n\nconst steps = Number(settings.steps ?? 4);\nconst cfg = Number(settings.cfg ?? 1.0);\nconst denoise = Number(settings.denoise ?? 1.0);\nconst loraStrength = Number(settings.lora_strength ?? 1.0);\nconst modelShift = Number(settings.model_shift ?? 3.1);\n\nconst useNegative = settings.use_negative_prompt !== false;\nconst negativePrompt = useNegative ? suppliedNegative : '';\n\nconst workflow = {\n  \"1\": {\n    \"class_type\": \"LoadImage\",\n    \"inputs\": {\n      \"image\": uploadedName\n    },\n    \"_meta\": {\n      \"title\": \"Imagen recibida desde Telegram\"\n    }\n  },\n\n  \"2\": {\n    \"class_type\": \"FluxKontextImageScale\",\n    \"inputs\": {\n      \"image\": [\"1\", 0]\n    },\n    \"_meta\": {\n      \"title\": \"Ajustar imagen\"\n    }\n  },\n\n  \"3\": {\n    \"class_type\": \"UNETLoader\",\n    \"inputs\": {\n      \"unet_name\": \"qwen_image_edit_2511_bf16.safetensors\",\n      \"weight_dtype\": \"default\"\n    },\n    \"_meta\": {\n      \"title\": \"Qwen Image Edit 2511\"\n    }\n  },\n\n  \"4\": {\n    \"class_type\": \"ModelSamplingAuraFlow\",\n    \"inputs\": {\n      \"model\": [\"3\", 0],\n      \"shift\": modelShift\n    }\n  },\n\n  \"5\": {\n    \"class_type\": \"CFGNorm\",\n    \"inputs\": {\n      \"model\": [\"4\", 0],\n      \"strength\": 1.0,\n      \"pre_cfg\": false\n    }\n  },\n\n  \"6\": {\n    \"class_type\": \"LoraLoaderModelOnly\",\n    \"inputs\": {\n      \"model\": [\"5\", 0],\n      \"lora_name\": \"Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors\",\n      \"strength_model\": loraStrength\n    }\n  },\n\n  \"7\": {\n    \"class_type\": \"CLIPLoader\",\n    \"inputs\": {\n      \"clip_name\": \"qwen_2.5_vl_7b_fp8_scaled.safetensors\",\n      \"type\": \"qwen_image\",\n      \"device\": \"default\"\n    }\n  },\n\n  \"8\": {\n    \"class_type\": \"VAELoader\",\n    \"inputs\": {\n      \"vae_name\": \"qwen_image_vae.safetensors\"\n    }\n  },\n\n  \"9\": {\n    \"class_type\": \"TextEncodeQwenImageEditPlus\",\n    \"inputs\": {\n      \"clip\": [\"7\", 0],\n      \"prompt\": positivePrompt,\n      \"vae\": [\"8\", 0],\n      \"image1\": [\"2\", 0]\n    }\n  },\n\n  \"10\": {\n    \"class_type\": \"FluxKontextMultiReferenceLatentMethod\",\n    \"inputs\": {\n      \"conditioning\": [\"9\", 0],\n      \"reference_latents_method\": \"index_timestep_zero\"\n    }\n  },\n\n  \"11\": {\n    \"class_type\": \"TextEncodeQwenImageEditPlus\",\n    \"inputs\": {\n      \"clip\": [\"7\", 0],\n      \"prompt\": negativePrompt,\n      \"vae\": [\"8\", 0],\n      \"image1\": [\"2\", 0]\n    }\n  },\n\n  \"12\": {\n    \"class_type\": \"FluxKontextMultiReferenceLatentMethod\",\n    \"inputs\": {\n      \"conditioning\": [\"11\", 0],\n      \"reference_latents_method\": \"index_timestep_zero\"\n    }\n  },\n\n  \"13\": {\n    \"class_type\": \"VAEEncode\",\n    \"inputs\": {\n      \"pixels\": [\"2\", 0],\n      \"vae\": [\"8\", 0]\n    }\n  },\n\n  \"14\": {\n    \"class_type\": \"KSampler\",\n    \"inputs\": {\n      \"model\": [\"6\", 0],\n      \"positive\": [\"10\", 0],\n      \"negative\": [\"12\", 0],\n      \"latent_image\": [\"13\", 0],\n      \"seed\": seed,\n      \"steps\": steps,\n      \"cfg\": cfg,\n      \"sampler_name\": \"euler\",\n      \"scheduler\": \"simple\",\n      \"denoise\": denoise\n    }\n  },\n\n  \"15\": {\n    \"class_type\": \"VAEDecode\",\n    \"inputs\": {\n      \"samples\": [\"14\", 0],\n      \"vae\": [\"8\", 0]\n    }\n  },\n\n  \"16\": {\n    \"class_type\": \"SaveImage\",\n    \"inputs\": {\n      \"images\": [\"15\", 0],\n      \"filename_prefix\": `HERCULES_caricatura_${tipo}`\n    }\n  }\n};\n\nreturn [{\n  json: {\n    chat_id: chatId,\n    tipo_sujeto: tipo,\n    clasificacion_ollama: $json.clasificacion_ollama || {},\n    positive_prompt: positivePrompt,\n    negative_prompt: negativePrompt,\n    local_settings: settings,\n    seed,\n    workflow\n  }\n}];"
+      },
+      "id": "0127593e-9c61-4ae9-b77c-b5b295272d4e",
+      "name": "Preparar workflow ComfyUI",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4000,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://HERCULES_IP:8188/prompt",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { prompt: $json.workflow, client_id: 'n8n-hercules-caricatura' } }}",
+        "options": {
+          "timeout": 3000000
+        }
+      },
+      "id": "cac082aa-2b01-476d-b794-f9f57805c427",
+      "name": "Enviar a ComfyUI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4240,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const promptId = $json.prompt_id;\n\nif (!promptId) {\n  throw new Error('ComfyUI no devolvió prompt_id.');\n}\n\nconst baseUrl = 'http://HERCULES_IP:8188';\nlet entry = null;\n\nfor (let attempt = 0; attempt < 600; attempt++) {\n  await new Promise(resolve => setTimeout(resolve, 3000));\n\n  const history = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `${baseUrl}/history/${promptId}`,\n    json: true,\n    timeout: 3000000\n  });\n\n  const candidate = history?.[promptId] || history;\n\n  if (candidate?.outputs && Object.keys(candidate.outputs).length > 0) {\n    entry = candidate;\n    break;\n  }\n}\n\nif (!entry) {\n  throw new Error('ComfyUI no terminó dentro del tiempo de espera.');\n}\n\nlet imageInfo = null;\n\nfor (const output of Object.values(entry.outputs)) {\n  if (output?.images?.length) {\n    imageInfo = output.images[0];\n    break;\n  }\n}\n\nif (!imageInfo) {\n  throw new Error('La ejecución terminó, pero ComfyUI no devolvió ninguna imagen.');\n}\n\nreturn [{\n  json: {\n    prompt_id: promptId,\n    chat_id: $('Procesar selección').first().json.chat_id,\n    filename: imageInfo.filename,\n    subfolder: imageInfo.subfolder || '',\n    type: imageInfo.type || 'output'\n  }\n}];"
+      },
+      "id": "41719a51-e470-4dd2-a285-c43b19765c8c",
+      "name": "Esperar resultado ComfyUI",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4496,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'http://HERCULES_IP:8188/view?filename=' + encodeURIComponent($json.filename) + '&subfolder=' + encodeURIComponent($json.subfolder || '') + '&type=' + encodeURIComponent($json.type || 'output') }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
+          "timeout": 3000000
+        }
+      },
+      "id": "4dd96af8-3927-438b-ac0a-9e949cf8d41e",
+      "name": "Descargar caricatura LOCAL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4752,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "sendPhoto",
+        "chatId": "={{ $('Procesar selección').first().json.chat_id }}",
+        "binaryData": true,
+        "additionalFields": {
+          "caption": "Caricatura generada en HERCULES local."
+        }
+      },
+      "id": "ad5a95ef-09b4-4c5e-b1ff-8a7751e4292a",
+      "name": "Devolver caricatura LOCAL",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        4992,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "await new Promise(resolve => setTimeout(resolve, 5000));\nreturn $input.all();"
+      },
+      "id": "6cdb0ec7-3c50-48c7-99f5-bf8daf7c1487",
+      "name": "Esperar 5 segundos tras Ollama",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2544,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = String($json?.message?.content || '').trim();\n\nif (!raw) {\n  throw new Error('Ollama no devolvió la clasificación.');\n}\n\nlet parsed;\n\ntry {\n  parsed = JSON.parse(raw);\n} catch (error) {\n  throw new Error('Ollama no devolvió JSON válido: ' + raw);\n}\n\nlet tipo = String(parsed.tipo_sujeto || '')\n  .toLowerCase()\n  .trim();\n\nconst aliases = {\n  persona: 'persona',\n  personas: 'persona',\n  person: 'persona',\n  people: 'persona',\n  humano: 'persona',\n  humana: 'persona',\n\n  animal: 'animal',\n  animales: 'animal',\n  cat: 'animal',\n  dog: 'animal',\n  gato: 'animal',\n  perro: 'animal',\n\n  objeto: 'objeto',\n  object: 'objeto',\n  artifact: 'objeto',\n  artefacto: 'objeto',\n  maquina: 'objeto',\n  máquina: 'objeto',\n  vehiculo: 'objeto',\n  vehículo: 'objeto',\n\n  mixto: 'mixto',\n  mixed: 'mixto'\n};\n\ntipo = aliases[tipo] || 'mixto';\n\nreturn [{\n  json: {\n    ...$json,\n    tipo_sujeto: tipo,\n    clasificacion_ollama: parsed\n  }\n}];"
+      },
+      "id": "9e68f326-f49c-44a1-8344-d337f1c32490",
+      "name": "Normalizar clasificación",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2800,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ecfae562-ee8b-44ad-8328-d14dd55afc9b",
+              "leftValue": "={{ $json.tipo_sujeto }}",
+              "rightValue": "persona",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b149a4ac-5da2-405e-aa55-9652d5617798",
+      "name": "¿Tipo persona?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3040,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c548173c-1117-415e-aee0-aec3c9dcc727",
+              "leftValue": "={{ $json.tipo_sujeto }}",
+              "rightValue": "animal",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "6e99c512-b89b-439e-882c-9909609b837d",
+      "name": "¿Tipo animal?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3040,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0d92337e-c8a9-4c78-a4f4-6132f194ac22",
+              "leftValue": "={{ $json.tipo_sujeto }}",
+              "rightValue": "objeto",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "29abc88c-4a3b-47cc-a4fc-6cc32f93d045",
+      "name": "¿Tipo objeto?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3040,
+        768
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => ({\n  ...item,\n  json: {\n    ...item.json,\n    positive_base: \"Create a highly exaggerated hand-drawn caricature illustration based only on the person or people visible in the supplied reference image.\\n\\nUse exactly the same number of people as in the reference image. Do not add, remove, duplicate, replace or invent anyone.\\n\\nPreserve each person's recognizability, facial structure, hairstyle, expression, clothing, pose, head orientation, gaze, accessories and visible hand placement.\\n\\nExaggerate oversized expressive eyes, a very large cheerful smile and teeth, rounded or stretched cheeks, expressive eyebrows, enlarged head proportions, ears when appropriate and playful humorous facial proportions.\\n\\nMake the result unmistakably a humorous caricature, not a realistic portrait, fashion illustration or elegant portrait drawing.\\n\\nStyle: monochrome blue ballpoint pen caricature drawing, visible rough construction lines, loose hand-drawn strokes, hatching, crosshatching, lively expressive linework and professional caricature artist quality.\\n\\nComposition: one unified illustration, closely framed upper-body portrait, noticeably enlarged head and slightly smaller body, balanced composition and no photographic elements.\\n\\nBackground: plain warm cream background with subtle paper texture only. The cream background must fill the whole canvas.\\n\\nDo not depict a notebook, sketchbook, journal page, spiral binding, punched holes, perforations, dotted paper, grid paper, ruled paper, visible sheet, page edge or border.\\n\\nRender every visible detail only in blue ink and cream background. Do not use any other colors in the eyes, skin, hair, clothing or accessories.\\n\\nDo not include text, letters, numbers, captions, labels, names, logos, signatures or watermarks.\"\n  }\n}));"
+      },
+      "id": "56ef7f1f-8177-49b0-9031-68ebde70a0da",
+      "name": "PROMPT PERSONA POSITIVO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3296,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => ({\n  ...item,\n  json: {\n    ...item.json,\n    negative_prompt: \"realistic portrait, refined portrait, elegant portrait, fashion illustration, portrait painting, painterly illustration, realistic proportions, normal-sized head, small eyes, restrained expression, photorealistic, realistic skin tones, full color, multicolor, colored eyes, green eyes, yellow details, red details, watercolor, digital painting, smooth vector art, notebook, sketchbook, spiral binding, punched holes, dotted paper, grid paper, ruled paper, page edge, page border, text, letters, numbers, logo, signature, watermark\"\n  }\n}));"
+      },
+      "id": "7dda2883-e00a-4f44-bded-9c71d576739c",
+      "name": "PROMPT PERSONA NEGATIVO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3552,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => ({\n  ...item,\n  json: {\n    ...item.json,\n    positive_base: `Create a clearly exaggerated hand-drawn caricature of the exact animal visible in the supplied reference image.\n\nPreserve the exact animal species, natural anatomy, body structure, number of legs, paws, tail, ears, whiskers, fur pattern, markings, pose, head orientation and camera angle.\n\nKeep the animal fully animal and anatomically natural in the body.\n\nImportant caricature rule:\nmake the result obviously a caricature, not a normal animal sketch and not a realistic wildlife drawing.\n\nConcentrate the caricature exaggeration mainly in the face and head:\nenlarge the eyes,\nslightly enlarge the ears,\nslightly enlarge the muzzle,\nmake the cheeks fuller,\nmake the facial expression more playful, amusing and charming,\nmake the head a bit larger relative to the body,\nand exaggerate the most distinctive facial traits of the animal in a humorous way.\n\nKeep the body natural and believable:\ndo not add human shoulders, human arms, human hands, human chest, human waist or human posture.\nDo not make the animal bipedal.\nDo not transform it into a mascot, furry character or humanoid animal.\n\nThe final result should feel like a professional animal caricature:\nfunny, expressive, charming and clearly exaggerated,\nwhile still looking unmistakably like the same animal.\n\nStyle: monochrome blue ballpoint pen caricature drawing, lively loose hand-drawn strokes, visible sketch lines, rich hatching and crosshatching, on a plain warm cream background.\n\nNo notebook, sketchbook, spiral binding, punched holes, dotted paper, grid paper, page border, text, logo, signature or watermark.\n\nmake the head noticeably larger relative to the body\npush the facial exaggeration further while keeping the body natural\nmake the expression more playful and amusing\nemphasize the cheeks, muzzle and eyes more strongly\n`\n  }\n}));"
+      },
+      "id": "c0b86837-7a64-45c2-a146-87844ea54da9",
+      "name": "PROMPT ANIMAL POSITIVO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3296,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => ({\n  ...item,\n  json: {\n    ...item.json,\n    negative_prompt: `realistic wildlife drawing, normal animal sketch, plain animal illustration, photographic animal, zoological illustration, stiff realistic anatomy, expressionless animal, anthropomorphic animal, humanoid animal, human torso, human chest, human shoulders, human arms, human hands, human fingers, bipedal stance, mascot, furry character, person with animal head, human clothing, notebook, sketchbook, spiral binding, punched holes, dotted paper, grid paper, page border, text, logo, signature, watermark`\n  }\n}));"
+      },
+      "id": "dcad1f55-6a96-40fd-959f-76147c9a5c91",
+      "name": "PROMPT ANIMAL NEGATIVO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3552,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => ({\n  ...item,\n  json: {\n    ...item.json,\n    positive_base: `Create a clearly exaggerated and humorous hand-drawn caricature of the exact object, artifact, machine, vehicle, suit or technical subject visible in the supplied reference image.\n\nPreserve the object's identity, real construction, essential components, materials, silhouette, orientation and camera angle.\n\nMake the result unmistakably a caricature, not a normal technical drawing, not a museum illustration and not a realistic object sketch.\n\nExaggerate the object's most distinctive real features in a playful way.\n\nFor vehicles, aircraft or machines:\nenlarge the most characteristic components,\nexaggerate wings, propellers, wheels, tail, cockpit, body shape or mechanical parts when appropriate,\nuse playful distorted proportions,\nslightly bend or stretch the silhouette,\nand create a dynamic humorous perspective.\n\nFor historical or technical artifacts:\nemphasize the most recognizable parts,\nmake important components larger or more expressive,\nand use controlled visual distortion while preserving recognizability.\n\nDo not add a human face, eyes, mouth, teeth, hands or human body to the object.\n\nDo not convert the object into a mascot or humanoid character.\n\nThe humor must come from exaggerated shape, scale, perspective and proportions, not from adding a human face.\n\nStyle: monochrome blue ballpoint pen caricature drawing, lively loose hand-drawn strokes, visible sketch construction lines, hatching and crosshatching on a plain warm cream background.\n\nComposition: show the object prominently, closely framed and occupying most of the image. Avoid excessive empty space and avoid large pedestals, tables or display bases unless essential.\n\nBackground: plain warm cream background with subtle paper texture only. No notebook, sketchbook, spiral binding, punched holes, dotted paper, grid paper, page edge or border.\n\nDo not include invented text, letters, numbers, labels, logos, signatures or watermarks.`\n  }\n}));"
+      },
+      "id": "822aa596-8de3-4e53-9663-77215c5db944",
+      "name": "PROMPT OBJETO POSITIVO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3296,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => ({\n  ...item,\n  json: {\n    ...item.json,\n    negative_prompt: `normal technical drawing, realistic object sketch, museum catalog illustration, engineering diagram, flat realistic proportions, neutral perspective, stiff composition, excessive empty space, oversized pedestal, oversized table, display plinth, human face, eyes on object, mouth on object, teeth on object, human hands, human body, humanoid object, mascot, cartoon character, invented components, invented labels, invented text, full color, multicolor, notebook, sketchbook, spiral binding, punched holes, dotted paper, grid paper, page edge, page border, logo, signature, watermark`\n  }\n}));"
+      },
+      "id": "cdd27650-ef23-43a5-b7aa-b62c76ff19b9",
+      "name": "PROMPT OBJETO NEGATIVO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3552,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => ({\n  ...item,\n  json: {\n    ...item.json,\n    positive_base: `Create one unified, clearly exaggerated and humorous hand-drawn caricature illustration based only on all the principal subjects visible in the supplied reference image.\n\nPreserve the exact number and category of every principal subject. Do not add, remove, duplicate, replace or invent any person, animal or object.\n\nPreserve the original composition, relative positions, scale relationships, camera angle, subject orientation and interaction between all visible subjects.\n\nPERSONS:\nCaricature every visible person using enlarged expressive eyes, exaggerated smiles, cheeks, eyebrows, ears and enlarged head proportions when appropriate.\nPreserve identity, hairstyle, expression, clothing, pose, head orientation, gaze, accessories and visible hand placement.\nMake people clearly humorous and caricatured, not realistic portraits.\n\nANIMALS:\nKeep every animal completely animal.\nPreserve species, breed, anatomy, number of legs, paws, tail, ears, muzzle, whiskers, fur or feather patterns, markings, pose and head orientation.\nExaggerate only genuine animal features such as the eyes, ears, muzzle, cheeks, whiskers, paws and tail.\nDo not add human arms, hands, shoulders, clothing, posture, hairstyle, human teeth or human facial anatomy.\n\nOBJECTS, VEHICLES AND TECHNICAL ELEMENTS:\nPreserve the object's identity, construction, essential components, materials, silhouette, orientation and camera angle.\nMake objects clearly caricatured by exaggerating their most distinctive real features, scale, perspective and proportions.\nFor vehicles or machines, exaggerate wings, propellers, wheels, tails, cockpits, body shapes or mechanical components when appropriate.\nDo not add human faces, eyes, mouths, teeth, hands or bodies to objects.\nThe humor must come from shape, scale, perspective and proportion, not anthropomorphism.\n\nThe final result must look like one coherent caricature scene, not separate drawings pasted together.\n\nStyle: monochrome blue ballpoint pen caricature drawing, lively loose hand-drawn strokes, visible construction lines, hatching and crosshatching on a plain warm cream background.\n\nComposition: keep all important subjects clearly visible and balanced. Avoid excessive empty space, oversized pedestals, unnecessary tables or invented background elements.\n\nBackground: plain warm cream background with subtle paper texture only. No notebook, sketchbook, spiral binding, punched holes, dotted paper, grid paper, page edge or border.\n\nRender every visible detail only in blue ink and cream background.\n\nDo not include invented text, letters, numbers, labels, captions, names, logos, signatures or watermarks.`\n  }\n}));"
+      },
+      "id": "326a112e-5876-42fa-abcb-c88b52012cf9",
+      "name": "PROMPT MIXTO POSITIVO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3296,
+        816
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => ({\n  ...item,\n  json: {\n    ...item.json,\n    negative_prompt: `added subject, removed subject, duplicated subject, replaced subject, separate panels, collage, split screen, disconnected composition, pasted character, realistic portrait, realistic proportions, expressionless person, anthropomorphic animal, humanoid animal, human torso on animal, human arms on animal, human hands on animal, human clothing on animal, person with animal head, furry character, mascot, human face on object, eyes on object, mouth on object, teeth on object, humanoid object, smiling machine, invented components, invented accessories, invented text, incorrect relative scale, altered positions, excessive empty space, oversized pedestal, oversized table, realistic technical drawing, museum catalog illustration, full color, multicolor, colored eyes, realistic skin tones, notebook, sketchbook, spiral binding, punched holes, dotted paper, grid paper, page edge, page border, text, logo, signature, watermark`\n  }\n}));"
+      },
+      "id": "619cf644-8c32-46de-9c01-3b785d06f093",
+      "name": "PROMPT MIXTO NEGATIVO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3552,
+        816
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => ({\n  ...item,\n  json: {\n    ...item.json,\n    local_settings: {\n      seed_mode: 'random',\n      fixed_seed: 987654321,\n      steps: 4,\n      cfg: 1.0,\n      denoise: 1.0,\n      lora_strength: 1.0,\n      model_shift: 3.1,\n      use_negative_prompt: true\n    }\n  }\n}));"
+      },
+      "id": "5174e40e-e07c-46ba-95cc-ce9cffb1be6a",
+      "name": "AJUSTES LOCAL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3792,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/images/edits",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer REEMPLAZA_CON_TU_OPENAI_API_KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "image",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "model",
+              "value": "gpt-image-1.5"
+            },
+            {
+              "name": "size",
+              "value": "1024x1536"
+            },
+            {
+              "name": "quality",
+              "value": "medium"
+            },
+            {
+              "name": "output_format",
+              "value": "png"
+            },
+            {
+              "name": "prompt",
+              "value": "Create a highly exaggerated hand-drawn caricature illustration based only on the person or people visible in the supplied reference image. Use exactly the same number of people as in the reference image: do not add, remove, duplicate, replace or invent anyone. Preserve each person's recognizability, facial structure, hairstyle, expression, clothing, pose and visible hand placement. Exaggerate oversized expressive eyes, a very large cheerful smile and teeth, rounded or stretched cheeks, expressive eyebrows, enlarged head proportions, ears when appropriate and playful humorous facial proportions. Style: blue pencil sketch, graphite-style shading, visible rough construction lines, loose hand-drawn strokes, crosshatching, professional caricature artist quality, highly detailed facial drawing, whimsical sketchbook illustration, polished but intentionally hand-drawn. Composition: one unified illustration, closely framed upper-body portrait, balanced composition, no separate panels and no photographic elements. Background: clean cream-colored sketchbook paper with subtle paper texture and minimal background. Do not include the original photograph, realistic portraits, split screen, comparison panels, reference thumbnails, borders, labels, captions, names, logos, watermarks or text. Preserve recognizability despite the strong exaggeration."
+            }
+          ]
+        },
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "0784c227-8bb3-43c2-a0d5-6b0f154a20a3",
+      "name": "Crear caricatura con OpenAI1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2144,
+        -16
+      ],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "¿Es selección de botón?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Es selección de botón?": {
+      "main": [
+        [
+          {
+            "node": "Procesar selección",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "¿Hay imagen?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Hay imagen?": {
+      "main": [
+        [
+          {
+            "node": "Preparar imagen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Pedir una imagen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar imagen": {
+      "main": [
+        [
+          {
+            "node": "Subir foto temporal a ComfyUI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Subir foto temporal a ComfyUI": {
+      "main": [
+        [
+          {
+            "node": "Guardar solicitud",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar solicitud": {
+      "main": [
+        [
+          {
+            "node": "Mostrar botones Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Procesar selección": {
+      "main": [
+        [
+          {
+            "node": "Confirmar botón en Telegram",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "¿Selección válida?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Selección válida?": {
+      "main": [
+        [
+          {
+            "node": "Quitar botones",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Recuperar foto original",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recuperar foto original": {
+      "main": [
+        [
+          {
+            "node": "¿Motor Local?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Motor Local?": {
+      "main": [
+        [
+          {
+            "node": "Preparar foto para Ollama",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Crear caricatura con OpenAI1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Base64 OpenAI a imagen": {
+      "main": [
+        [
+          {
+            "node": "Devolver caricatura OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar foto para Ollama": {
+      "main": [
+        [
+          {
+            "node": "Analizar con Ollama",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analizar con Ollama": {
+      "main": [
+        [
+          {
+            "node": "Esperar 5 segundos tras Ollama",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar workflow ComfyUI": {
+      "main": [
+        [
+          {
+            "node": "Enviar a ComfyUI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar a ComfyUI": {
+      "main": [
+        [
+          {
+            "node": "Esperar resultado ComfyUI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Esperar resultado ComfyUI": {
+      "main": [
+        [
+          {
+            "node": "Descargar caricatura LOCAL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Descargar caricatura LOCAL": {
+      "main": [
+        [
+          {
+            "node": "Devolver caricatura LOCAL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Esperar 5 segundos tras Ollama": {
+      "main": [
+        [
+          {
+            "node": "Normalizar clasificación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar clasificación": {
+      "main": [
+        [
+          {
+            "node": "¿Tipo persona?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Tipo persona?": {
+      "main": [
+        [
+          {
+            "node": "PROMPT PERSONA POSITIVO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "¿Tipo animal?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Tipo animal?": {
+      "main": [
+        [
+          {
+            "node": "PROMPT ANIMAL POSITIVO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "¿Tipo objeto?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Tipo objeto?": {
+      "main": [
+        [
+          {
+            "node": "PROMPT OBJETO POSITIVO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PROMPT MIXTO POSITIVO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PROMPT PERSONA POSITIVO": {
+      "main": [
+        [
+          {
+            "node": "PROMPT PERSONA NEGATIVO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PROMPT PERSONA NEGATIVO": {
+      "main": [
+        [
+          {
+            "node": "AJUSTES LOCAL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PROMPT ANIMAL POSITIVO": {
+      "main": [
+        [
+          {
+            "node": "PROMPT ANIMAL NEGATIVO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PROMPT ANIMAL NEGATIVO": {
+      "main": [
+        [
+          {
+            "node": "AJUSTES LOCAL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PROMPT OBJETO POSITIVO": {
+      "main": [
+        [
+          {
+            "node": "PROMPT OBJETO NEGATIVO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PROMPT OBJETO NEGATIVO": {
+      "main": [
+        [
+          {
+            "node": "AJUSTES LOCAL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PROMPT MIXTO POSITIVO": {
+      "main": [
+        [
+          {
+            "node": "PROMPT MIXTO NEGATIVO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PROMPT MIXTO NEGATIVO": {
+      "main": [
+        [
+          {
+            "node": "AJUSTES LOCAL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AJUSTES LOCAL": {
+      "main": [
+        [
+          {
+            "node": "Preparar workflow ComfyUI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crear caricatura con OpenAI1": {
+      "main": [
+        [
+          {
+            "node": "Base64 OpenAI a imagen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
