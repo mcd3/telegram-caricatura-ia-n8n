@@ -2,60 +2,262 @@
 
 ![Portada del proyecto](assets/portada-github.jpg)
 
-Workflow de **n8n** que recibe una fotografía desde un bot de Telegram, genera una caricatura en estilo lápiz azul mediante la API de OpenAI y devuelve el resultado al mismo chat.
+Workflow de **n8n** que recibe una fotografía desde un bot de Telegram y permite elegir entre dos motores de generación:
 
-La idea es sencilla: cualquier persona puede crear desde el móvil una caricatura divertida de una fotografía, sin instalar aplicaciones adicionales y sin manejar directamente herramientas de generación de imágenes.
+- **OpenAI**, como referencia de calidad inmediata.
+- **Local HERCULES**, utilizando Ollama y ComfyUI en infraestructura propia.
 
-## Objetivo del proyecto
+El resultado se devuelve automáticamente al mismo chat de Telegram.
 
-Este workflow nace como una demostración sencilla y divertida: enviar una fotografía desde Telegram, transformarla en una caricatura mediante inteligencia artificial y recibir el resultado en el mismo móvil.
+La versión 2 convierte el proyecto inicial en un sistema híbrido, configurable y preparado para evolucionar hacia una generación completamente local.
 
-La primera versión utiliza la API de OpenAI para validar todo el proceso:
+---
 
-- recepción de imágenes desde Telegram;
-- gestión del archivo dentro de n8n;
-- aplicación de un prompt estable;
-- generación de la caricatura;
-- conversión de la respuesta;
-- devolución automática al usuario.
+## Versión actual
 
-Una vez validado el funcionamiento completo, el siguiente objetivo es sustituir progresivamente la generación en la nube por modelos de inteligencia artificial ejecutados de forma local en **HERCULES**, nuestro cerebro de IA.
-
-El workflow servirá como banco de pruebas para comparar calidad, velocidad, coste, privacidad y consumo de recursos entre OpenAI y distintos modelos locales.
-
-## Demostración
-
-| Workflow en n8n | Resultado |
-|---|---|
-| ![Workflow de n8n](assets/workflow-n8n.jpg) | ![Caricatura generada](assets/resultado-caricatura.jpg) |
-
-## Qué hace el workflow
+La versión recomendada es:
 
 ```text
-Telegram Trigger
-       │
-       ▼
-¿Hay una imagen?
-   ├── No  → Pedir una imagen
-   └── Sí  → Avisar «Trabajando...»
-                  │
-                  ▼
-        OpenAI Images Edits API
-                  │
-                  ▼
-          Convertir Base64 a PNG
-                  │
-                  ▼
-        Enviar caricatura a Telegram
+workflow/Telegram_HERCULES_V11_GitHub_SIN_CREDENCIALES_ACTUALIZADO.json
 ```
 
-El archivo compartido mantiene la estructura del workflow original. Únicamente se han sustituido las credenciales por marcadores genéricos.
+Esta versión incorpora selector de motor, clasificación automática del contenido, prompts específicos por tipo de sujeto y generación local mediante HERCULES.
 
-## Evolución hacia IA local: HERCULES
+---
 
-OpenAI se utiliza inicialmente como motor de referencia para comprobar que la experiencia completa funciona correctamente.
+## Demostración de la versión 2
 
-La siguiente fase consiste en conectar n8n con **HERCULES**, nuestra infraestructura local de inteligencia artificial, para procesar las imágenes sin depender necesariamente de servicios externos.
+| Selector en Telegram | Workflow V2 en n8n |
+|---|---|
+| ![Selector OpenAI o Local HERCULES](assets/sample_telegram_v2.jpg) | ![Workflow V2 en n8n](assets/workflow_caricatura_v2.jpg) |
+
+---
+
+## Qué hace la versión 2
+
+```text
+Telegram
+   │
+   ▼
+Recibe una fotografía
+   │
+   ▼
+Botones inline dentro de Telegram
+   ├── OpenAI
+   └── Local HERCULES
+```
+
+### Rama OpenAI
+
+```text
+Fotografía
+   │
+   ▼
+OpenAI Images Edits API
+   │
+   ▼
+Conversión Base64 a PNG
+   │
+   ▼
+Envío del resultado a Telegram
+```
+
+### Rama Local HERCULES
+
+```text
+Fotografía
+   │
+   ▼
+Ollama clasifica el contenido
+   ├── Persona
+   ├── Animal
+   ├── Objeto
+   └── Mixto
+   │
+   ▼
+Prompt positivo y negativo específico
+   │
+   ▼
+ComfyUI
+   │
+   ▼
+Qwen Image Edit 2511
+   │
+   ▼
+Lightning LoRA de 4 pasos
+   │
+   ▼
+Resultado en Telegram
+```
+
+---
+
+## Novedades principales de la versión 2
+
+### 1. Selector OpenAI o Local HERCULES
+
+El usuario elige directamente desde Telegram mediante botones inline:
+
+```text
+✨ OpenAI
+🖥️ Local HERCULES
+```
+
+Los botones funcionan mediante `callback_query`, sin abrir el navegador ni páginas externas.
+
+### 2. Clasificación automática con Ollama
+
+Antes de generar localmente, Ollama analiza únicamente el tipo principal de contenido:
+
+```json
+{"tipo_sujeto":"persona"}
+```
+
+Valores posibles:
+
+- `persona`
+- `animal`
+- `objeto`
+- `mixto`
+
+Ollama no redacta el prompt completo. Su función es seleccionar la rama correcta.
+
+### 3. Prompts independientes por categoría
+
+La versión 2 incorpora prompts positivos y negativos separados para:
+
+- personas;
+- animales;
+- objetos, vehículos y elementos técnicos;
+- escenas mixtas.
+
+Esto evita errores como:
+
+- animales convertidos en personas;
+- objetos con ojos o caras;
+- trajes vacíos interpretados como personas;
+- escenas mixtas tratadas como un único sujeto humano.
+
+### 4. Prompt específico para personas
+
+La rama de personas busca:
+
+- mantener reconocibilidad;
+- exagerar ojos, sonrisa, mejillas y proporciones;
+- conservar pose, ropa, orientación y accesorios;
+- producir una caricatura clara, no un retrato realista.
+
+### 5. Prompt específico para animales
+
+La rama animal:
+
+- conserva anatomía natural;
+- evita cuerpo humano, brazos, manos o ropa;
+- concentra la exageración en cabeza, ojos, orejas, hocico y mejillas;
+- mantiene especie, pelaje, marcas, postura y cola.
+
+### 6. Prompt específico para objetos
+
+La rama de objetos:
+
+- conserva identidad y componentes reales;
+- exagera forma, escala, proporción y perspectiva;
+- evita añadir caras, ojos, boca o anatomía humana;
+- funciona especialmente bien con vehículos, aviones, máquinas y piezas museográficas.
+
+### 7. Prompt específico para escenas mixtas
+
+La rama mixta aplica reglas diferentes dentro de una misma imagen:
+
+- personas: exageración facial;
+- animales: anatomía animal natural;
+- objetos: exageración estructural sin antropomorfismo.
+
+El objetivo es mantener una escena coherente, no una suma de dibujos separados.
+
+### 8. Generación local con ComfyUI
+
+La rama local utiliza:
+
+```text
+Qwen Image Edit 2511
+Qwen 2.5 VL
+Qwen Image VAE
+Lightning LoRA 4 steps
+```
+
+Configuración actual:
+
+| Parámetro | Valor |
+|---|---:|
+| Steps | `4` |
+| CFG | `1.0` |
+| Denoise | `1.0` |
+| Model shift | `3.1` |
+| LoRA strength | `1.0` |
+| Sampler | `euler` |
+| Scheduler | `simple` |
+
+### 9. Mejora de velocidad
+
+Sin Lightning LoRA, las pruebas podían tardar varios minutos.
+
+Con el Lightning LoRA de 4 pasos, la generación local normalmente termina en menos de 100 segundos y, cuando los modelos ya están cargados, puede reducirse mucho más.
+
+El timeout no determina la duración real. Solo establece el tiempo máximo permitido.
+
+### 10. Gestión de memoria GPU
+
+Para evitar conflictos entre Ollama y ComfyUI:
+
+```json
+"keep_alive": 0
+```
+
+Ollama descarga el modelo de la GPU después de clasificar.
+
+Después se ejecuta una espera de 5 segundos antes de enviar el trabajo a ComfyUI.
+
+También se mantienen:
+
+```text
+Timeout HTTP: 3000000 ms
+Comprobaciones ComfyUI: 600
+Intervalo entre comprobaciones: 3 segundos
+```
+
+### 11. Configuración centralizada
+
+El nodo:
+
+```text
+AJUSTES LOCAL
+```
+
+permite modificar sin tocar el workflow principal:
+
+- seed aleatoria o fija;
+- steps;
+- CFG;
+- denoise;
+- fuerza del LoRA;
+- model shift;
+- activación del prompt negativo.
+
+### 12. Protección frente a dobles ejecuciones
+
+Cada solicitud se identifica mediante un token temporal.
+
+Cuando el usuario pulsa un botón:
+
+- se recupera la fotografía correcta;
+- se consume la solicitud;
+- se evita ejecutar dos veces la misma imagen;
+- se eliminan los botones de selección.
+
+---
+
+## Arquitectura general
 
 ```text
 Telegram
@@ -65,230 +267,430 @@ n8n
    │
    ├── OpenAI API
    │
-   └── HERCULES — IA local
-             │
-             ▼
-       Modelo de imagen local
-             │
-             ▼
-        Resultado generado
+   └── HERCULES
+         ├── Ollama
+         │     └── qwen3-vl:8b-instruct
+         │
+         └── ComfyUI
+               ├── Qwen Image Edit 2511
+               ├── Qwen 2.5 VL
+               ├── Qwen Image VAE
+               └── Lightning LoRA 4 steps
    │
    ▼
 Telegram
 ```
 
-La comparación tendrá en cuenta:
-
-- calidad visual;
-- parecido con las personas originales;
-- respeto por el número de personas;
-- tiempo de generación;
-- consumo de GPU y memoria;
-- coste por imagen;
-- privacidad;
-- posibilidad de funcionamiento local.
+---
 
 ## Requisitos
 
+### Requisitos generales
+
 - Una instancia de n8n.
 - Un bot de Telegram creado mediante `@BotFather`.
-- Una clave de la API de OpenAI con facturación habilitada.
 - Una URL pública HTTPS para los webhooks de Telegram.
-- Acceso al modelo `gpt-image-1.5`.
+
+### Para la rama OpenAI
+
+- Una clave de API de OpenAI.
+- Facturación habilitada.
+- Acceso al modelo configurado en el workflow.
+
+### Para la rama Local HERCULES
+
+- Un equipo con GPU NVIDIA.
+- Ollama accesible desde n8n.
+- ComfyUI accesible desde n8n.
+- Qwen Image Edit 2511.
+- Qwen 2.5 VL.
+- Qwen Image VAE.
+- Lightning LoRA de 4 pasos.
+- Conectividad de red entre n8n y HERCULES.
+
+Puertos utilizados:
+
+```text
+Ollama: 11434
+ComfyUI: 8188
+```
+
+---
 
 ## Instalación rápida
 
 ### 1. Descargar el proyecto
-
-Descarga este repositorio o clónalo:
 
 ```bash
 git clone https://github.com/TU_USUARIO/telegram-caricatura-ia-n8n.git
 cd telegram-caricatura-ia-n8n
 ```
 
-### 2. Crear el bot de Telegram
+### 2. Importar el workflow
 
-1. Abre Telegram.
-2. Busca `@BotFather`.
-3. Ejecuta `/newbot`.
-4. Indica el nombre y el nombre de usuario del bot.
-5. Guarda el token en un lugar seguro.
-
-No publiques el token en GitHub, capturas, logs o documentación.
-
-### 3. Crear la clave de OpenAI
-
-Crea una clave de API dentro de tu proyecto de OpenAI y guárdala de forma segura.
-
-El workflow utiliza:
+Importa:
 
 ```text
-POST https://api.openai.com/v1/images/edits
-```
-
-Configuración incluida:
-
-| Parámetro | Valor |
-|---|---|
-| Modelo | `gpt-image-1.5` |
-| Tamaño | `1024x1536` |
-| Calidad | `medium` |
-| Formato | `png` |
-| Tiempo máximo | `300000 ms` |
-
-### 4. Importar el workflow en n8n
-
-Importa el archivo:
-
-```text
-workflow/Telegram_Caricatura_IA_sin_credenciales.json
+workflow/Telegram_HERCULES_V11_GitHub_SIN_CREDENCIALES_ACTUALIZADO.json
 ```
 
 En n8n:
 
 1. Abre **Workflows**.
 2. Selecciona **Import from File**.
-3. Elige el JSON del directorio `workflow`.
+3. Elige el JSON.
 4. Guarda el workflow.
 
-### 5. Configurar Telegram en n8n
+### 3. Configurar Telegram
 
-Crea una credencial nueva de Telegram con el token obtenido en `@BotFather`.
+Crea una credencial de Telegram en n8n y asígnala a todos los nodos Telegram.
 
-Después selecciona esa misma credencial en estos nodos:
+Nodos principales:
 
 - `Telegram Trigger`
-- `Trabajando`
+- `Mostrar botones Telegram`
 - `Pedir una imagen`
-- `Devolver caricatura`
+- `Confirmar botón en Telegram`
+- `Quitar botones`
+- `Devolver caricatura OpenAI`
+- `Devolver caricatura LOCAL`
 
-Los valores incluidos en el JSON son marcadores y no son credenciales reales:
+### 4. Configurar OpenAI
 
-```text
-YOUR_TELEGRAM_CREDENTIAL_ID
-YOUR_TELEGRAM_CREDENTIAL_NAME
-```
-
-### 6. Configurar OpenAI
-
-Abre el nodo:
+En:
 
 ```text
-Crear caricatura con OpenAI
+Crear caricatura con OpenAI1
 ```
 
-En el encabezado `Authorization`, sustituye:
+sustituye:
 
 ```text
-Bearer YOUR_OPENAI_API_KEY
+REEMPLAZA_CON_TU_OPENAI_API_KEY
 ```
 
-por tu clave real:
+por tu clave real.
+
+No publiques nunca una exportación que contenga una clave real.
+
+### 5. Configurar HERCULES
+
+Sustituye:
 
 ```text
-Bearer sk-...
+HERCULES_IP
 ```
 
-Hazlo únicamente dentro de tu instancia privada de n8n. No vuelvas a exportar y publicar el workflow con esa clave.
+por la IP o nombre DNS del equipo local.
 
-Para una instalación más segura, puedes sustituir posteriormente el encabezado escrito directamente por una credencial de tipo **Header Auth** gestionada por n8n.
-
-### 7. Configurar el webhook
-
-Telegram necesita alcanzar tu instancia de n8n mediante una dirección pública HTTPS.
-
-En instalaciones detrás de un proxy inverso, configura correctamente:
+Ejemplos:
 
 ```text
-WEBHOOK_URL=https://n8n.tudominio.com/
-N8N_PROXY_HOPS=1
+http://HERCULES_IP:11434
+http://HERCULES_IP:8188
 ```
 
-No utilices `localhost` como webhook de producción.
+### 6. Activar el workflow
 
-### 8. Activar y probar
+Telegram admite un único webhook activo por bot.
 
-1. Guarda el workflow.
-2. Actívalo.
-3. Abre el bot en Telegram.
-4. Envía una fotografía como imagen.
-5. El bot enviará `Trabajando...`.
-6. Tras procesarla, devolverá la caricatura en PNG.
+Deja activo únicamente un workflow para cada bot de Telegram.
 
-## Prompt completo utilizado
+---
 
-El prompt se publica de forma visible porque es una parte importante del proyecto y servirá como referencia para comparar OpenAI con los futuros modelos locales de HERCULES.
+## Estado actual de la generación local
+
+La rama local ya funciona de extremo a extremo:
+
+- recibe la fotografía;
+- clasifica el contenido;
+- selecciona el prompt;
+- libera VRAM;
+- genera en ComfyUI;
+- devuelve el resultado a Telegram.
+
+La calidad actual es válida como banco de pruebas, pero todavía no iguala de forma consistente el resultado de OpenAI en:
+
+- parecido facial;
+- fuerza de la caricatura;
+- estabilidad del estilo;
+- control fino de la exageración;
+- consistencia entre distintas fotografías.
+
+---
+
+## Siguiente fase: LoRA propio de caricaturas
+
+El trabajo pendiente más importante es entrenar un **LoRA propio para Qwen Image Edit 2511**.
+
+El objetivo es fijar localmente el estilo que actualmente produce OpenAI:
 
 ```text
-Create a highly exaggerated hand-drawn caricature illustration based only on the person or people visible in the supplied reference image. Use exactly the same number of people as in the reference image: do not add, remove, duplicate, replace or invent anyone. Preserve each person's recognizability, facial structure, hairstyle, expression, clothing, pose and visible hand placement. Exaggerate oversized expressive eyes, a very large cheerful smile and teeth, rounded or stretched cheeks, expressive eyebrows, enlarged head proportions, ears when appropriate and playful humorous facial proportions. Style: blue pencil sketch, graphite-style shading, visible rough construction lines, loose hand-drawn strokes, crosshatching, professional caricature artist quality, highly detailed facial drawing, whimsical sketchbook illustration, polished but intentionally hand-drawn. Composition: one unified illustration, closely framed upper-body portrait, balanced composition, no separate panels and no photographic elements. Background: clean cream-colored sketchbook paper with subtle paper texture and minimal background. Do not include the original photograph, realistic portraits, split screen, comparison panels, reference thumbnails, borders, labels, captions, names, logos, watermarks or text. Preserve recognizability despite the strong exaggeration.
+caricatura reconocible
+bolígrafo azul monocromo
+fondo crema
+ojos y sonrisa exagerados
+pose y ropa conservadas
+sin libreta, texto ni elementos inventados
 ```
 
-También está disponible por separado en [`docs/PROMPT.md`](docs/PROMPT.md).
+### Dataset previsto
 
-## Roadmap
+El dataset se preparará con parejas separadas:
+
+```text
+dataset/
+├── target/
+│   ├── 0001.png
+│   ├── 0002.png
+│   └── 0003.png
+│
+└── control/
+    ├── 0001.png
+    ├── 0002.png
+    └── 0003.png
+```
+
+- `control`: fotografía original.
+- `target`: caricatura buena generada con OpenAI.
+
+Los nombres deben coincidir:
+
+```text
+control/0001.png
+target/0001.png
+```
+
+No se deben unir ambas imágenes en un único archivo.
+
+### Herramienta de entrenamiento
+
+El entrenamiento se realizará con:
+
+```text
+Ostris / AI-Toolkit
+```
+
+Modelo objetivo:
+
+```text
+Qwen Image Edit 2511
+```
+
+### Cantidad inicial prevista
+
+Primera fase:
+
+```text
+40–60 parejas de alta calidad
+```
+
+Prioridades del dataset:
+
+- personas de frente;
+- tres cuartos;
+- perfil;
+- cabezas inclinadas;
+- distintas edades;
+- hombres y mujeres;
+- fotografías con gafas;
+- una y varias personas;
+- variedad de ropa, iluminación y encuadre.
+
+Solo se incluirán resultados:
+
+- claramente reconocibles;
+- sin personas añadidas o eliminadas;
+- sin texto ni marcas;
+- sin colores no deseados;
+- sin errores anatómicos graves;
+- con estilo coherente de caricatura azul.
+
+### Objetivo del LoRA
+
+Cuando el LoRA propio esté entrenado, HERCULES debería ofrecer:
+
+- estilo más estable;
+- mayor parecido;
+- menos dependencia del prompt;
+- resultados repetibles;
+- menor dependencia de servicios externos;
+- control local de modelo, workflow y parámetros;
+- mejor privacidad;
+- coste marginal por imagen mucho menor.
+
+---
+
+## Roadmap actualizado
 
 - [x] Recepción de fotografías mediante Telegram.
 - [x] Automatización completa con n8n.
-- [x] Generación de caricaturas mediante OpenAI.
-- [x] Conversión de Base64 a imagen PNG.
-- [x] Devolución automática al chat de origen.
-- [ ] Añadir control de errores y mensajes al usuario.
-- [ ] Añadir selección de estilos.
-- [ ] Crear un endpoint local de generación en HERCULES.
-- [ ] Conectar n8n con HERCULES.
-- [ ] Probar modelos locales de edición y generación de imágenes.
-- [ ] Comparar OpenAI con IA local.
-- [ ] Añadir un selector entre motor remoto y motor local.
-- [ ] Evaluar un funcionamiento completamente local.
+- [x] Generación mediante OpenAI.
+- [x] Conversión Base64 a PNG.
+- [x] Devolución automática al chat.
+- [x] Botones inline OpenAI / Local HERCULES.
+- [x] Eliminación de la apertura del navegador.
+- [x] Conexión de n8n con Ollama.
+- [x] Conexión de n8n con ComfyUI.
+- [x] Clasificación persona / animal / objeto / mixto.
+- [x] Prompts positivos y negativos independientes.
+- [x] Gestión de VRAM con `keep_alive: 0`.
+- [x] Espera de seguridad antes de ejecutar ComfyUI.
+- [x] Generación local con Qwen Image Edit 2511.
+- [x] Lightning LoRA de 4 pasos.
+- [x] Ajustes centralizados.
+- [x] Workflow público sin credenciales.
+- [ ] Reunir 40–60 parejas para el dataset.
+- [ ] Revisar y descartar muestras defectuosas.
+- [ ] Preparar configuración de Ostris / AI-Toolkit.
+- [ ] Entrenar el LoRA propio.
+- [ ] Comparar LoRA propio con OpenAI.
+- [ ] Afinar fuerza del LoRA y parámetros.
+- [ ] Crear una versión estable completamente local.
+- [ ] Añadir control de errores y mensajes más detallados.
+- [ ] Añadir registro de tiempos, consumo y calidad.
+- [ ] Documentar instalación completa de HERCULES.
+
+---
+
 ## Seguridad
 
-- Nunca publiques claves, tokens o exportaciones de credenciales.
-- Revisa los archivos antes de cada `git push`.
+- Nunca publiques claves, tokens o credenciales.
+- Revisa los JSON antes de cada `git push`.
+- Los workflows exportados por n8n pueden incluir nombres e identificadores de credenciales.
 - Revoca inmediatamente cualquier clave expuesta.
-- Evita incluir capturas del navegador donde aparezcan tokens o URL privadas.
-- Los JSON exportados por n8n pueden contener nombres e identificadores de credenciales, aunque no incluyan necesariamente el secreto.
+- No publiques direcciones IP privadas si no es necesario.
+- Evita capturas donde aparezcan tokens, claves o datos sensibles.
 - Consulta [`SECURITY.md`](SECURITY.md).
 
-## Privacidad y uso responsable
+---
 
-Las fotografías pasan por Telegram, tu instancia de n8n y la API de OpenAI. Informa a las personas usuarias y obtén permiso para procesar fotografías de terceros.
+## Privacidad
 
-La instancia de n8n puede conservar datos y archivos binarios dentro del historial de ejecuciones según su configuración. Para un bot público, revisa el almacenamiento de ejecuciones, el borrado automático y la política de privacidad de tu servicio.
+### Rama OpenAI
 
-No presentes el resultado como una fotografía real ni lo utilices para suplantar, acosar o perjudicar a otras personas.
+La fotografía pasa por:
+
+```text
+Telegram → n8n → OpenAI → n8n → Telegram
+```
+
+### Rama Local HERCULES
+
+La fotografía pasa por:
+
+```text
+Telegram → n8n → HERCULES → n8n → Telegram
+```
+
+Aunque la generación sea local, Telegram y n8n siguen interviniendo.
+
+La instancia de n8n puede conservar imágenes y datos binarios en el historial de ejecuciones. Revisa:
+
+- almacenamiento de ejecuciones;
+- borrado automático;
+- política de privacidad;
+- permisos de acceso;
+- copias de seguridad.
+
+---
 
 ## Costes
 
-La API de OpenAI tiene coste por uso. El importe depende del modelo, la calidad, el tamaño y la tarifa vigente. Define límites de gasto y supervisa el consumo antes de ofrecer el bot públicamente.
+### OpenAI
+
+Tiene coste por imagen según modelo, calidad, tamaño y tarifa vigente.
+
+### HERCULES local
+
+No tiene coste por llamada externa, pero utiliza:
+
+- GPU;
+- electricidad;
+- almacenamiento;
+- mantenimiento;
+- tiempo de procesamiento.
+
+---
 
 ## Problemas frecuentes
 
-### `Bad request: bad webhook: An HTTPS URL must be provided`
+### El bot abre el navegador
 
-La URL configurada para el webhook no es pública o no usa HTTPS. Revisa `WEBHOOK_URL`, el certificado y el proxy inverso.
+La versión actual utiliza botones inline de Telegram mediante `callback_query`.
 
-### El bot funciona en pruebas, pero no en producción
+Importa la versión V11 y no utilices nodos `sendAndWait`.
 
-Telegram admite un único webhook activo por bot. Al alternar entre prueba y producción, una URL puede reemplazar a la otra. Usa bots distintos para pruebas y producción.
+### Se generan OpenAI y Local a la vez
 
-### Error `401` de OpenAI
-
-La clave es incorrecta, ha sido revocada o no está escrita como:
+Revisa el nodo:
 
 ```text
-Bearer TU_CLAVE
+¿Motor Local?
 ```
 
-### No se recibe una imagen
+Debe tener:
 
-Envía la fotografía como imagen desde Telegram y comprueba que el nodo `Telegram Trigger` tiene activada la descarga de imágenes o archivos.
+```text
+TRUE  → Preparar foto para Ollama
+FALSE → Crear caricatura con OpenAI
+```
 
-### No existe `data[0].b64_json`
+### Error CUDA out of memory
 
-La petición de OpenAI ha fallado o la respuesta no contiene la imagen esperada. Revisa la ejecución del nodo HTTP y el mensaje de error devuelto por la API.
+Comprueba:
 
-## Estructura del repositorio
+```text
+keep_alive: 0
+```
+
+Después de Ollama debe existir una espera de 5 segundos.
+
+También verifica que no haya otras aplicaciones ocupando la GPU.
+
+### La primera imagen tarda mucho más
+
+Es normal. ComfyUI debe cargar los modelos.
+
+Las siguientes generaciones suelen ser más rápidas mientras los modelos permanecen cargados.
+
+### El animal aparece humanizado
+
+Revisa los nodos:
+
+```text
+PROMPT ANIMAL POSITIVO
+PROMPT ANIMAL NEGATIVO
+```
+
+### El objeto parece un dibujo técnico y no una caricatura
+
+Revisa:
+
+```text
+PROMPT OBJETO POSITIVO
+PROMPT OBJETO NEGATIVO
+```
+
+La exageración debe aplicarse a forma, escala, perspectiva y proporciones, no añadiendo caras.
+
+### Ollama devuelve JSON inválido
+
+El nodo HTTP debe enviar:
+
+```text
+={{ $json.ollama_body }}
+```
+
+El objeto JSON se construye previamente en:
+
+```text
+Preparar foto para Ollama
+```
+
+---
+
+## Estructura recomendada del repositorio
 
 ```text
 telegram-caricatura-ia-n8n/
@@ -297,14 +699,17 @@ telegram-caricatura-ia-n8n/
 ├── assets/
 │   ├── portada-github.jpg
 │   ├── resultado-caricatura.jpg
-│   └── workflow-n8n.jpg
+│   ├── workflow-n8n.jpg
+│   ├── sample_telegram_v2.jpg
+│   └── workflow_caricatura_v2.jpg
 ├── docs/
 │   ├── CONFIGURACION.md
 │   ├── PRIVACIDAD.md
 │   ├── PROMPT.md
 │   └── PUBLICAR_EN_GITHUB.md
 ├── workflow/
-│   └── Telegram_Caricatura_IA_sin_credenciales.json
+│   ├── Telegram_Caricatura_IA_sin_credenciales.json
+│   └── Telegram_HERCULES_V11_GitHub_SIN_CREDENCIALES_ACTUALIZADO.json
 ├── .gitignore
 ├── ASSETS.md
 ├── CHANGELOG.md
@@ -314,11 +719,40 @@ telegram-caricatura-ia-n8n/
 └── SECURITY.md
 ```
 
+---
+
+## Historial de versiones
+
+### Versión 1
+
+- Telegram → OpenAI → Telegram.
+- Un único motor.
+- Prompt fijo.
+- Sin clasificación.
+- Sin ejecución local.
+
+### Versión 2
+
+- Selector OpenAI / Local HERCULES.
+- Botones inline sin navegador.
+- Ollama como clasificador.
+- ComfyUI como motor local.
+- Qwen Image Edit 2511.
+- Lightning LoRA de 4 pasos.
+- Prompts específicos por categoría.
+- Gestión de memoria GPU.
+- Ajustes centralizados.
+- Preparación para LoRA propio.
+
+---
+
 ## Licencia
 
 El workflow y la documentación se publican bajo licencia MIT. Consulta [`LICENSE`](LICENSE).
 
 Las imágenes de demostración se incluyen únicamente para documentar el funcionamiento del proyecto. Consulta [`ASSETS.md`](ASSETS.md).
+
+---
 
 ## Autor
 
