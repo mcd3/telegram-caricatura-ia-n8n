@@ -12,6 +12,19 @@ La idea es sencilla: cualquier persona puede crear desde el móvil una caricatur
 |---|---|
 | ![Workflow de n8n](assets/workflow-n8n.jpg) | ![Caricatura generada](assets/resultado-caricatura.jpg) |
 
+
+## Prompt utilizado
+
+Este es el prompt principal del proyecto, listo para copiar y pegar en OpenAI o adaptar a otros generadores de imágenes:
+
+```text
+Create a highly exaggerated hand-drawn caricature illustration based only on the person or people visible in the supplied reference image. Use exactly the same number of people as in the reference image: do not add, remove, duplicate, replace or invent anyone. Preserve each person's recognizability, facial structure, hairstyle, expression, clothing, pose and visible hand placement. Exaggerate oversized expressive eyes, a very large cheerful smile and teeth, rounded or stretched cheeks, expressive eyebrows, enlarged head proportions, ears when appropriate and playful humorous facial proportions. Style: blue pencil sketch, graphite-style shading, visible rough construction lines, loose hand-drawn strokes, crosshatching, professional caricature artist quality, highly detailed facial drawing, whimsical sketchbook illustration, polished but intentionally hand-drawn. Composition: one unified illustration, closely framed upper-body portrait, balanced composition, no separate panels and no photographic elements. Background: clean cream-colored sketchbook paper with subtle paper texture and minimal background. Do not include the original photograph, realistic portraits, split screen, comparison panels, reference thumbnails, borders, labels, captions, names, logos, watermarks or text. Preserve recognizability despite the strong exaggeration.
+```
+
+El mismo prompt ya está incluido dentro del nodo `Crear caricatura con OpenAI` del workflow.
+
+También está disponible por separado en [`docs/PROMPT.md`](docs/PROMPT.md).
+
 ## Qué hace el workflow
 
 ```text
