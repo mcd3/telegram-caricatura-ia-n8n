@@ -6,24 +6,28 @@ Workflow de **n8n** que recibe una fotografía desde un bot de Telegram, genera 
 
 La idea es sencilla: cualquier persona puede crear desde el móvil una caricatura divertida de una fotografía, sin instalar aplicaciones adicionales y sin manejar directamente herramientas de generación de imágenes.
 
+## Objetivo del proyecto
+
+Este workflow nace como una demostración sencilla y divertida: enviar una fotografía desde Telegram, transformarla en una caricatura mediante inteligencia artificial y recibir el resultado en el mismo móvil.
+
+La primera versión utiliza la API de OpenAI para validar todo el proceso:
+
+- recepción de imágenes desde Telegram;
+- gestión del archivo dentro de n8n;
+- aplicación de un prompt estable;
+- generación de la caricatura;
+- conversión de la respuesta;
+- devolución automática al usuario.
+
+Una vez validado el funcionamiento completo, el siguiente objetivo es sustituir progresivamente la generación en la nube por modelos de inteligencia artificial ejecutados de forma local en **HERCULES**, nuestro cerebro de IA.
+
+El workflow servirá como banco de pruebas para comparar calidad, velocidad, coste, privacidad y consumo de recursos entre OpenAI y distintos modelos locales.
+
 ## Demostración
 
 | Workflow en n8n | Resultado |
 |---|---|
 | ![Workflow de n8n](assets/workflow-n8n.jpg) | ![Caricatura generada](assets/resultado-caricatura.jpg) |
-
-
-## Prompt utilizado
-
-Este es el prompt principal del proyecto, listo para copiar y pegar en OpenAI o adaptar a otros generadores de imágenes:
-
-```text
-Create a highly exaggerated hand-drawn caricature illustration based only on the person or people visible in the supplied reference image. Use exactly the same number of people as in the reference image: do not add, remove, duplicate, replace or invent anyone. Preserve each person's recognizability, facial structure, hairstyle, expression, clothing, pose and visible hand placement. Exaggerate oversized expressive eyes, a very large cheerful smile and teeth, rounded or stretched cheeks, expressive eyebrows, enlarged head proportions, ears when appropriate and playful humorous facial proportions. Style: blue pencil sketch, graphite-style shading, visible rough construction lines, loose hand-drawn strokes, crosshatching, professional caricature artist quality, highly detailed facial drawing, whimsical sketchbook illustration, polished but intentionally hand-drawn. Composition: one unified illustration, closely framed upper-body portrait, balanced composition, no separate panels and no photographic elements. Background: clean cream-colored sketchbook paper with subtle paper texture and minimal background. Do not include the original photograph, realistic portraits, split screen, comparison panels, reference thumbnails, borders, labels, captions, names, logos, watermarks or text. Preserve recognizability despite the strong exaggeration.
-```
-
-El mismo prompt ya está incluido dentro del nodo `Crear caricatura con OpenAI` del workflow.
-
-También está disponible por separado en [`docs/PROMPT.md`](docs/PROMPT.md).
 
 ## Qué hace el workflow
 
@@ -46,6 +50,43 @@ Telegram Trigger
 ```
 
 El archivo compartido mantiene la estructura del workflow original. Únicamente se han sustituido las credenciales por marcadores genéricos.
+
+## Evolución hacia IA local: HERCULES
+
+OpenAI se utiliza inicialmente como motor de referencia para comprobar que la experiencia completa funciona correctamente.
+
+La siguiente fase consiste en conectar n8n con **HERCULES**, nuestra infraestructura local de inteligencia artificial, para procesar las imágenes sin depender necesariamente de servicios externos.
+
+```text
+Telegram
+   │
+   ▼
+n8n
+   │
+   ├── OpenAI API
+   │
+   └── HERCULES — IA local
+             │
+             ▼
+       Modelo de imagen local
+             │
+             ▼
+        Resultado generado
+   │
+   ▼
+Telegram
+```
+
+La comparación tendrá en cuenta:
+
+- calidad visual;
+- parecido con las personas originales;
+- respeto por el número de personas;
+- tiempo de generación;
+- consumo de GPU y memoria;
+- coste por imagen;
+- privacidad;
+- posibilidad de funcionamiento local.
 
 ## Requisitos
 
@@ -175,10 +216,31 @@ No utilices `localhost` como webhook de producción.
 5. El bot enviará `Trabajando...`.
 6. Tras procesarla, devolverá la caricatura en PNG.
 
-## Prompt incluido
+## Prompt completo utilizado
 
-El prompt exacto está documentado en [`docs/PROMPT.md`](docs/PROMPT.md). También permanece integrado dentro del JSON del workflow.
+El prompt se publica de forma visible porque es una parte importante del proyecto y servirá como referencia para comparar OpenAI con los futuros modelos locales de HERCULES.
 
+```text
+Create a highly exaggerated hand-drawn caricature illustration based only on the person or people visible in the supplied reference image. Use exactly the same number of people as in the reference image: do not add, remove, duplicate, replace or invent anyone. Preserve each person's recognizability, facial structure, hairstyle, expression, clothing, pose and visible hand placement. Exaggerate oversized expressive eyes, a very large cheerful smile and teeth, rounded or stretched cheeks, expressive eyebrows, enlarged head proportions, ears when appropriate and playful humorous facial proportions. Style: blue pencil sketch, graphite-style shading, visible rough construction lines, loose hand-drawn strokes, crosshatching, professional caricature artist quality, highly detailed facial drawing, whimsical sketchbook illustration, polished but intentionally hand-drawn. Composition: one unified illustration, closely framed upper-body portrait, balanced composition, no separate panels and no photographic elements. Background: clean cream-colored sketchbook paper with subtle paper texture and minimal background. Do not include the original photograph, realistic portraits, split screen, comparison panels, reference thumbnails, borders, labels, captions, names, logos, watermarks or text. Preserve recognizability despite the strong exaggeration.
+```
+
+También está disponible por separado en [`docs/PROMPT.md`](docs/PROMPT.md).
+
+## Roadmap
+
+- [x] Recepción de fotografías mediante Telegram.
+- [x] Automatización completa con n8n.
+- [x] Generación de caricaturas mediante OpenAI.
+- [x] Conversión de Base64 a imagen PNG.
+- [x] Devolución automática al chat de origen.
+- [ ] Añadir control de errores y mensajes al usuario.
+- [ ] Añadir selección de estilos.
+- [ ] Crear un endpoint local de generación en HERCULES.
+- [ ] Conectar n8n con HERCULES.
+- [ ] Probar modelos locales de edición y generación de imágenes.
+- [ ] Comparar OpenAI con IA local.
+- [ ] Añadir un selector entre motor remoto y motor local.
+- [ ] Evaluar un funcionamiento completamente local.
 ## Seguridad
 
 - Nunca publiques claves, tokens o exportaciones de credenciales.
